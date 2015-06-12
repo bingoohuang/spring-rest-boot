@@ -13,9 +13,9 @@ import java.io.PrintWriter;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
-    @ResponseStatus(HttpStatus.NOT_FOUND)
     @ExceptionHandler(NotFoundException.class)
     public void handleConflict(NotFoundException ex, HttpServletResponse response) {
+        response.setStatus(500);
         respondText(response, ex.getMessage());
     }
 
