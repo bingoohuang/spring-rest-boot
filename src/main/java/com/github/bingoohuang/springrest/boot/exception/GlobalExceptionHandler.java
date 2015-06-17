@@ -27,6 +27,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Throwable.class)
     public void handleConflict(Throwable ex, HttpServletResponse response) {
+        ex.printStackTrace();
         response.setStatus(500);
         respondText(response, ex.getMessage());
     }

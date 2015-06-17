@@ -108,12 +108,30 @@ public class RedisCacheEnabledMethodInterceptor implements MethodInterceptor {
             throw new RuntimeException(throwable);
         }
 
-        RedisCacheEnabled redisCacheAnn = invocation.getMethod().getAnnotation(RedisCacheEnabled.class);
-        long millis = redisCacheAnn.expirationMillis();
+        long millis = getExpirationMillis(invocation, value);
+
         String redisValueKey = prefix + ":value:" + arguments;
         redis.setex(redisValueKey, Json.jsonWithType(value), millis, TimeUnit.MILLISECONDS);
         cache.put(getCacheKey(prefix, arguments), value, CREATED, millis, TimeUnit.MILLISECONDS);
         return value;
+    }
+
+    private long getExpirationMillis(MethodInvocation invocation, Object value) {
+        RedisCacheEnabled redisCacheAnn = invocation.getMethod().getAnnotation(RedisCacheEnabled.class);
+        long millis = -1;
+        if (value instanceof CacheExpirationMilisAware) {
+            CacheExpirationMilisAware cacheExpirationMilisAware;
+            cacheExpirationMilisAware = (CacheExpirationMilisAware) value;
+            millis = cacheExpirationMilisAware.expirationMillis();
+        }
+
+        if (millis <= 0) millis = redisCacheAnn.expirationMillis();
+
+        if (millis <= 0) {
+            throw new RuntimeException("bad usage @RedisCacheEnabled, expirationMillis should be positive "
+                    + " or return type implements CacheExpirationMilisAware");
+        }
+        return millis;
     }
 
     private Object waitLockReleaseAndReadRedis(String prefix, String arguments) {
