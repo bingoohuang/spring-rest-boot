@@ -10,7 +10,6 @@ public class RestException extends RuntimeException {
 
     public RestException(int httpStatusCode, String message, Throwable cause) {
         super(message, cause);
-
         this.httpStatusCode = httpStatusCode;
     }
 
