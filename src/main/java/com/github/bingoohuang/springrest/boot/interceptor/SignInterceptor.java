@@ -51,18 +51,20 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         request.setAttribute("_log_start", System.currentTimeMillis());
 
         String originalStr = createOriginalStringForSign(request);
-        logger.info("spring rest server {} request {}", hici, originalStr);
+        logger.info("spring rest server {} request {}", hici, originalStr.replace("\n", "\\n"));
 
         if (ignoreSign) return true;
 
         String hisv = request.getHeader("hisv");
         if (Strings.isNullOrEmpty(hisv)) {
+            logger.info("spring rest server {} signature missed", hici);
             Http.error(response, 416, "signature missed");
             return false;
         }
 
         String sign = hmacSHA256(originalStr, CLIENT_SECURITY);
         boolean signOk = sign.equals(hisv);
+        logger.info("spring rest server {} sign result {}", hici, signOk);
         if (!signOk) Http.error(response, 416, "invalid signature");
 
         return signOk;
@@ -115,10 +117,11 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
     private boolean ignoreSign(Class<?> beanType, HandlerMethod method) {
         RestfulSign restfulSign = method.getMethod().getAnnotation(RestfulSign.class);
-        if (restfulSign == null || restfulSign.ignore()) return true;
+        if (restfulSign != null) return restfulSign.ignore();
 
         restfulSign = beanType.getAnnotation(RestfulSign.class);
-        return restfulSign != null && restfulSign.ignore();
+        if (restfulSign != null) return restfulSign.ignore();
+        return true;
     }
 
     public static String hmacSHA256(String data, String key) {
