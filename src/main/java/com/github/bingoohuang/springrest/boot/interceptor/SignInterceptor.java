@@ -96,7 +96,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         StringWriter sw = (StringWriter) request.getAttribute("_log_sw");
         String body = null;
 
-        String lowerContentType = contentType.toLowerCase();
+        String lowerContentType = StringUtils.lowerCase(contentType);
         if (containsAny(lowerContentType, "json", "xml", "text")) {
             byte[] bytes = baos.toByteArray();
             if (bytes.length > 0) {
@@ -117,6 +117,8 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     }
 
     private boolean containsAny(String contentType, String... any) {
+        if (contentType == null) return false;
+
         for (String item : any) {
             if (contentType.contains(item)) return true;
         }
