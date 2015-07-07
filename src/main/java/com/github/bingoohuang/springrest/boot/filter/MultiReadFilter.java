@@ -22,12 +22,13 @@ public class MultiReadFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         // use wrapper to read multiple times the content
-        MultiReadHttpServletRequest req = new MultiReadHttpServletRequest((HttpServletRequest) request);
+        BufferedRequestWrapper req = new BufferedRequestWrapper((HttpServletRequest) request);
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
         final StringWriter sw = new StringWriter();
         req.setAttribute("_log_baos", baos);
         req.setAttribute("_log_sw", sw);
+        req.setAttribute("_log_req", req);
 
         chain.doFilter(req, new HttpServletResponseWrapper((HttpServletResponse) response) {
             @Override

@@ -1,6 +1,7 @@
 package com.github.bingoohuang.springrest.boot.interceptor;
 
 import com.github.bingoohuang.springrest.boot.annotations.RestfulSign;
+import com.github.bingoohuang.springrest.boot.filter.BufferedRequestWrapper;
 import com.github.bingoohuang.utils.codec.Base64;
 import com.github.bingoohuang.utils.net.Http;
 import com.google.common.base.Joiner;
@@ -49,8 +50,18 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         request.setAttribute("_log_hici", hici);
         request.setAttribute("_log_start", System.currentTimeMillis());
 
+        String contentType = request.getContentType();
+        String lowerContentType = StringUtils.lowerCase(contentType);
+        String requestBody = null;
+        if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
+            BufferedRequestWrapper requestWrapper = (BufferedRequestWrapper) request.getAttribute("_log_req");
+            requestBody = requestWrapper.getRequestBody();
+        }
+        if (StringUtils.isEmpty(requestBody)) requestBody = "(empty)";
+
         String originalStr = createOriginalStringForSign(request);
-        logger.info("spring rest server {} request {}", hici, originalStr.replace("\n", "\\n"));
+        logger.info("spring rest server {} request {} body: {}",
+                hici, originalStr.replace("\n", "\\n"), requestBody.replace("\n", "\\n"));
 
         if (ignoreSign) return true;
 
