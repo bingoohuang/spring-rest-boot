@@ -25,6 +25,7 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.security.MessageDigest;
 import java.util.*;
 
@@ -88,22 +89,38 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             joiner.join(headers);
             headerSb.append(headers).append('&');
         }
-
-        String body;
+        String contentType = response.getContentType();
+        headerSb.append("Content-Type=").append(contentType);
 
         ByteArrayOutputStream baos = (ByteArrayOutputStream) request.getAttribute("_log_baos");
-        String contentType = response.getContentType();
-        if (StringUtils.contains(contentType, "image")) {
-            body = "image";
-        } else {
-            body = new String(baos.toByteArray(), "UTF-8");
+        StringWriter sw = (StringWriter) request.getAttribute("_log_sw");
+        String body = null;
+
+        String lowerContentType = contentType.toLowerCase();
+        if (containsAny(lowerContentType, "json", "xml", "text")) {
+            byte[] bytes = baos.toByteArray();
+            if (bytes.length > 0) {
+                body = new String(bytes, "UTF-8");
+            } else {
+                body = sw.toString();
+            }
         }
+
+        if (body.contains("<html>") || body == null) body = " ignored";
+        body = body.replaceAll("\\r?\\n", "\\n");
 
         String hici = (String) request.getAttribute("_log_hici");
         Long start = (Long) request.getAttribute("_log_start");
         long costMillis = System.currentTimeMillis() - start;
 
         logger.info("spring rest server {} response cost {} millis, headers: {}, body: {}", hici, costMillis, headerSb, body);
+    }
+
+    private boolean containsAny(String contentType, String... any) {
+        for (String item : any) {
+            if (contentType.contains(item)) return true;
+        }
+        return false;
     }
 
     private String createOriginalStringForSign(HttpServletRequest request) {

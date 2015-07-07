@@ -10,6 +10,7 @@ import javax.servlet.http.HttpServletResponseWrapper;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 
 @Component
 public class MultiReadFilter implements Filter {
@@ -24,19 +25,23 @@ public class MultiReadFilter implements Filter {
         MultiReadHttpServletRequest req = new MultiReadHttpServletRequest((HttpServletRequest) request);
 
         final ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        final StringWriter sw = new StringWriter();
         req.setAttribute("_log_baos", baos);
+        req.setAttribute("_log_sw", sw);
 
         chain.doFilter(req, new HttpServletResponseWrapper((HttpServletResponse) response) {
             @Override
             public ServletOutputStream getOutputStream() throws IOException {
-                return new DelegatingServletOutputStream(new TeeOutputStream(super.getOutputStream(), baos)
-                );
+                ServletOutputStream outputStream = super.getOutputStream();
+                TeeOutputStream targetStream = new TeeOutputStream(outputStream, baos);
+                return new DelegatingServletOutputStream(targetStream);
             }
 
             @Override
             public PrintWriter getWriter() throws IOException {
-                return new PrintWriter(new DelegatingServletOutputStream(new TeeOutputStream(super.getOutputStream(), baos))
-                );
+                PrintWriter writer = super.getWriter();
+                TeeWriter teeWriter = new TeeWriter(writer, sw);
+                return new PrintWriter(teeWriter);
             }
         });
     }
