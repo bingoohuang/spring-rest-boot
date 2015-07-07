@@ -33,9 +33,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     public static final String CLIENT_SECURITY = "d51fd93e-f6c9-4eae-ae7a-9b37af1a60cc";
 
     @Override
-    public boolean preHandle(
-            HttpServletRequest request, HttpServletResponse response, Object handler)
-            throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         if (!(handler instanceof HandlerMethod)) return false;
 
         HandlerMethod method = (HandlerMethod) handler;
@@ -97,7 +95,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         String body = null;
 
         String lowerContentType = StringUtils.lowerCase(contentType);
-        if (containsAny(lowerContentType, "json", "xml", "text")) {
+        if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
             byte[] bytes = baos.toByteArray();
             if (bytes.length > 0) {
                 body = new String(bytes, "UTF-8");
@@ -113,11 +111,12 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         Long start = (Long) request.getAttribute("_log_start");
         long costMillis = System.currentTimeMillis() - start;
 
-        logger.info("spring rest server {} response cost {} millis, headers: {}, body: {}", hici, costMillis, headerSb, body);
+        logger.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
+                hici, costMillis, response.getStatus(), headerSb, body);
     }
 
-    private boolean containsAny(String contentType, String... any) {
-        if (contentType == null) return false;
+    private boolean containsAnyOrNull(String contentType, String... any) {
+        if (contentType == null) return true;
 
         for (String item : any) {
             if (contentType.contains(item)) return true;
