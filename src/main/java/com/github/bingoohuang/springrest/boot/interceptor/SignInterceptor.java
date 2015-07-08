@@ -60,8 +60,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         if (StringUtils.isEmpty(requestBody)) requestBody = "(empty)";
 
         String originalStr = createOriginalStringForSign(request);
-        logger.info("spring rest server {} request {} body: {}",
-                hici, originalStr.replace("\n", "\\n"), requestBody.replace("\n", "\\n"));
+        logger.info("spring rest server {} request {} body: {}", hici, originalStr, requestBody);
 
         if (ignoreSign) return true;
 
@@ -115,8 +114,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             }
         }
 
-        if (body.contains("<html>") || body == null) body = " ignored";
-        body = body.replaceAll("\\r?\\n", "\\n");
+        if (body == null || body.contains("<html>") ) body = " ignored";
 
         String hici = (String) request.getAttribute("_log_hici");
         Long start = (Long) request.getAttribute("_log_start");
