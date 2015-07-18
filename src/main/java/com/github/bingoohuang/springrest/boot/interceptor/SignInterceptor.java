@@ -59,8 +59,11 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         }
         if (StringUtils.isEmpty(requestBody)) requestBody = "(empty)";
 
-        String originalStr = createOriginalStringForSign(request);
-        logger.info("spring rest server {} request {} body: {}", hici, originalStr, requestBody);
+        final StringBuilder signStr = new StringBuilder();
+        final StringBuilder logStr = new StringBuilder();
+        Appendable proxy = new AbbreviateAppendable(logStr, signStr);
+        createOriginalStringForSign(proxy, request);
+        logger.info("spring rest server {} request {} body: {}", hici, logStr, requestBody);
 
         if (ignoreSign) return true;
 
@@ -71,7 +74,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             return false;
         }
 
-        String sign = hmacSHA256(originalStr, CLIENT_SECURITY);
+        String sign = hmacSHA256(signStr.toString(), CLIENT_SECURITY);
         boolean signOk = sign.equals(hisv);
         logger.info("spring rest server {} sign result {}", hici, signOk);
         if (!signOk) Http.error(response, 416, "invalid signature");
@@ -114,7 +117,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             }
         }
 
-        if (body == null || body.contains("<html>") ) body = " ignored";
+        if (body == null || body.contains("<html>")) body = " ignored";
 
         String hici = (String) request.getAttribute("_log_hici");
         Long start = (Long) request.getAttribute("_log_start");
@@ -133,13 +136,10 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         return false;
     }
 
-    private String createOriginalStringForSign(HttpServletRequest request) {
-        StringBuilder signStr = new StringBuilder();
-        appendMethodAndUrl(request, signStr);
-        appendHeaders(request, signStr);
-        appendRequestParams(request, signStr);
-
-        return signStr.toString();
+    private void createOriginalStringForSign(Appendable proxy, HttpServletRequest request) {
+        appendMethodAndUrl(request, proxy);
+        appendHeaders(request, proxy);
+        appendRequestParams(request, proxy);
     }
 
     private boolean ignoreSign(Class<?> beanType, HandlerMethod method) {
@@ -163,7 +163,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         }
     }
 
-    private void appendRequestParams(HttpServletRequest request, StringBuilder signStr) {
+    private void appendRequestParams(HttpServletRequest request, Appendable signStr) {
         Map<String, String[]> parameterMap = Maps.newTreeMap();
         parameterMap.putAll(request.getParameterMap());
 
@@ -179,7 +179,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
             signStr.append(parameterName).append('$');
             for (String value : entry.getValue()) {
-                signStr.append(value).append('$');
+                signStr.appendAbbreviate(value).append('$');
             }
         }
     }
@@ -257,7 +257,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             "content-length", "content-type"
     };
 
-    private void appendHeaders(HttpServletRequest request, StringBuilder signStr) {
+    private void appendHeaders(HttpServletRequest request, Appendable signStr) {
         Enumeration<String> headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String headerName = headerNames.nextElement();
@@ -270,20 +270,20 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         }
     }
 
-    private void joinEnumeration(StringBuilder signStr, Enumeration<String> headers) {
+    private void joinEnumeration(Appendable signStr, Enumeration<String> headers) {
         while (headers.hasMoreElements()) {
             signStr.append(headers.nextElement()).append('$');
         }
     }
 
-    private void appendMethodAndUrl(HttpServletRequest request, StringBuilder signStr) {
+    private void appendMethodAndUrl(HttpServletRequest request, Appendable signStr) {
         signStr.append(request.getMethod()).append('$');
 
         StringBuilder fullUrl = new StringBuilder(request.getRequestURL());
         String queryString = request.getQueryString();
         if (!Strings.isNullOrEmpty(queryString)) fullUrl.append('?').append(queryString);
 
-        signStr.append(fullUrl).append('$');
+        signStr.append(fullUrl.toString()).append('$');
     }
 
 }
