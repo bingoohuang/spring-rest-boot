@@ -107,6 +107,11 @@
             <artifactId>guava</artifactId>
             <version>18.0</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.bingoohuang</groupId>
+            <artifactId>asmvalidator</artifactId>
+            <version>0.0.1</version>
+        </dependency>
     </dependencies>
 
     <build>
