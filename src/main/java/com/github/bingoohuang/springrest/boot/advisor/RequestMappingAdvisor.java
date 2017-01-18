@@ -12,9 +12,10 @@ import java.lang.reflect.Method;
 @Component
 public class RequestMappingAdvisor extends AbstractPointcutAdvisor {
     final StaticMethodMatcherPointcut pointcut = new StaticMethodMatcherPointcut() {
-
         @Override
         public boolean matches(Method method, Class<?> targetClass) {
+            if (targetClass.getName().contains("$Proxy")) return false;
+
             return method.isAnnotationPresent(RequestMapping.class);
         }
     };
