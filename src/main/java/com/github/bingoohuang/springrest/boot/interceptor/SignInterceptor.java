@@ -90,8 +90,8 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
         val method = (HandlerMethod) handler;
         val beanType = method.getBeanType();
-        val logger = LoggerFactory.getLogger("rest." + beanType.getName());
-        if (!logger.isInfoEnabled()) return;
+        val log = LoggerFactory.getLogger("rest." + beanType.getName());
+        if (!log.isInfoEnabled()) return;
 
         val headerSb = new StringBuilder();
         val headerNames = rsp.getHeaderNames();
@@ -113,7 +113,7 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         val start = (Long) req.getAttribute("_log_start");
         val costMillis = System.currentTimeMillis() - start;
 
-        logger.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
+        log.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
                 hici, costMillis, rsp.getStatus(), headerSb, body);
     }
 
