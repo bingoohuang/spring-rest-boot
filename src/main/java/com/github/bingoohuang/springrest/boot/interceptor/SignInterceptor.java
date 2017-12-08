@@ -9,11 +9,10 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.io.CharStreams;
+import lombok.val;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -23,24 +22,25 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.security.MessageDigest;
-import java.util.*;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.UUID;
 
 public class SignInterceptor extends HandlerInterceptorAdapter {
     public static final String CLIENT_SECURITY = "d51fd93e-f6c9-4eae-ae7a-9b37af1a60cc";
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod)) return false;
 
-        HandlerMethod method = (HandlerMethod) handler;
-        Class<?> beanType = method.getBeanType();
-        boolean ignoreSign = ignoreSign(beanType, method);
-        Logger logger = LoggerFactory.getLogger("rest." + beanType.getName());
+        val method = (HandlerMethod) handler;
+        val beanType = method.getBeanType();
+        val ignoreSign = ignoreSign(beanType, method);
+        val logger = LoggerFactory.getLogger("rest." + beanType.getName());
 
         if (ignoreSign && !logger.isInfoEnabled()) return true;
 
@@ -50,32 +50,32 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         request.setAttribute("_log_hici", hici);
         request.setAttribute("_log_start", System.currentTimeMillis());
 
-        String contentType = request.getContentType();
-        String lowerContentType = StringUtils.lowerCase(contentType);
+        val contentType = request.getContentType();
+        val lowerContentType = StringUtils.lowerCase(contentType);
         String requestBody = null;
         if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
-            BufferedRequestWrapper requestWrapper = (BufferedRequestWrapper) request.getAttribute("_log_req");
+            val requestWrapper = (BufferedRequestWrapper) request.getAttribute("_log_req");
             requestBody = requestWrapper.getRequestBody();
         }
         if (StringUtils.isEmpty(requestBody)) requestBody = "(empty)";
 
-        final StringBuilder signStr = new StringBuilder();
-        final StringBuilder logStr = new StringBuilder();
-        Appendable proxy = new AbbreviateAppendable(logStr, signStr);
+        val signStr = new StringBuilder();
+        val logStr = new StringBuilder();
+        val proxy = new AbbreviateAppendable(logStr, signStr);
         createOriginalStringForSign(proxy, request);
         logger.info("spring rest server {} request {} body: {}", hici, logStr, requestBody);
 
         if (ignoreSign) return true;
 
-        String hisv = request.getHeader("hisv");
+        val hisv = request.getHeader("hisv");
         if (Strings.isNullOrEmpty(hisv)) {
             logger.info("spring rest server {} signature missed", hici);
             Http.error(response, 416, "signature missed");
             return false;
         }
 
-        String sign = hmacSHA256(signStr.toString(), CLIENT_SECURITY);
-        boolean signOk = sign.equals(hisv);
+        val sign = hmacSHA256(signStr.toString(), CLIENT_SECURITY);
+        val signOk = sign.equals(hisv);
         logger.info("spring rest server {} sign result {}", hici, signOk);
         if (!signOk) Http.error(response, 416, "invalid signature");
 
@@ -86,30 +86,30 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
         if (!(handler instanceof HandlerMethod)) return;
 
-        HandlerMethod method = (HandlerMethod) handler;
-        Class<?> beanType = method.getBeanType();
-        Logger logger = LoggerFactory.getLogger("rest." + beanType.getName());
+        val method = (HandlerMethod) handler;
+        val beanType = method.getBeanType();
+        val logger = LoggerFactory.getLogger("rest." + beanType.getName());
         if (!logger.isInfoEnabled()) return;
 
-        StringBuilder headerSb = new StringBuilder();
-        Collection<String> headerNames = response.getHeaderNames();
-        Joiner joiner = Joiner.on(',');
-        for (String headerName : headerNames) {
+        val headerSb = new StringBuilder();
+        val headerNames = response.getHeaderNames();
+        val joiner = Joiner.on(',');
+        for (val headerName : headerNames) {
             headerSb.append(headerName).append('=');
-            Collection<String> headers = response.getHeaders(headerName);
+            val headers = response.getHeaders(headerName);
             joiner.join(headers);
             headerSb.append(headers).append('&');
         }
-        String contentType = response.getContentType();
+        val contentType = response.getContentType();
         headerSb.append("Content-Type=").append(contentType);
 
-        ByteArrayOutputStream baos = (ByteArrayOutputStream) request.getAttribute("_log_baos");
-        StringWriter sw = (StringWriter) request.getAttribute("_log_sw");
+        val baos = (ByteArrayOutputStream) request.getAttribute("_log_baos");
+        val sw = (StringWriter) request.getAttribute("_log_sw");
         String body = null;
 
-        String lowerContentType = StringUtils.lowerCase(contentType);
+        val lowerContentType = StringUtils.lowerCase(contentType);
         if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
-            byte[] bytes = baos.toByteArray();
+            val bytes = baos.toByteArray();
             if (bytes.length > 0) {
                 body = new String(bytes, "UTF-8");
             } else {
@@ -119,9 +119,9 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
         if (body == null || body.contains("<html>")) body = " ignored";
 
-        String hici = (String) request.getAttribute("_log_hici");
-        Long start = (Long) request.getAttribute("_log_start");
-        long costMillis = System.currentTimeMillis() - start;
+        val hici = (String) request.getAttribute("_log_hici");
+        val start = (Long) request.getAttribute("_log_start");
+        val costMillis = System.currentTimeMillis() - start;
 
         logger.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
                 hici, costMillis, response.getStatus(), headerSb, body);
@@ -153,10 +153,10 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
     public static String hmacSHA256(String data, String key) {
         try {
-            SecretKeySpec secretKey = new SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
-            Mac mac = Mac.getInstance("HmacSHA256");
+            val secretKey = new SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
+            val mac = Mac.getInstance("HmacSHA256");
             mac.init(secretKey);
-            byte[] hmacData = mac.doFinal(data.getBytes("UTF-8"));
+            val hmacData = mac.doFinal(data.getBytes("UTF-8"));
             return Base64.base64(hmacData, Base64.Format.Standard);
         } catch (Exception e) {
             throw Throwables.propagate(e);
@@ -167,18 +167,18 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         Map<String, String[]> parameterMap = Maps.newTreeMap();
         parameterMap.putAll(request.getParameterMap());
 
-        String json = getJson(request);
+        val json = getJson(request);
         if (!Strings.isNullOrEmpty(json)) parameterMap.put("_json", new String[]{json});
         fileUpload(request, parameterMap);
 
-        String queryString = request.getQueryString();
-        for (Map.Entry<String, String[]> entry : parameterMap.entrySet()) {
-            String parameterName = entry.getKey();
+        val queryString = request.getQueryString();
+        for (val entry : parameterMap.entrySet()) {
+            val parameterName = entry.getKey();
             if (isQueryParameter(queryString, parameterName)) continue;
 
 
             signStr.append(parameterName).append('$');
-            for (String value : entry.getValue()) {
+            for (val value : entry.getValue()) {
                 signStr.appendAbbreviate(value).append('$');
             }
         }
@@ -187,15 +187,15 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     private void fileUpload(HttpServletRequest request, Map<String, String[]> parameterMap) {
         if (!(request instanceof MultipartHttpServletRequest)) return;
 
-        MultipartHttpServletRequest mreq = (MultipartHttpServletRequest) request;
-        MultiValueMap<String, MultipartFile> multiFileMap = mreq.getMultiFileMap();
+        val mreq = (MultipartHttpServletRequest) request;
+        val multiFileMap = mreq.getMultiFileMap();
 
-        for (Map.Entry<String, List<MultipartFile>> entry : multiFileMap.entrySet()) {
-            String name = entry.getKey();
+        for (val entry : multiFileMap.entrySet()) {
+            val name = entry.getKey();
 
-            StringBuilder sb = new StringBuilder();
-            List<MultipartFile> value = entry.getValue();
-            for (MultipartFile file : value) {
+            val sb = new StringBuilder();
+            val value = entry.getValue();
+            for (val file : value) {
                 sb.append(md5(getBytes(file))).append('$');
             }
             if (sb.length() > 0) sb.delete(sb.length() - 1, sb.length());
@@ -214,8 +214,8 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
 
     public static String md5(byte[] bytes) {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(bytes);
+            val md = MessageDigest.getInstance("MD5");
+            val digest = md.digest(bytes);
             return Base64.base64(digest, Base64.Format.Standard);
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -225,12 +225,12 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     public String getJson(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) return null;
 
-        String contentType = request.getHeader("content-type");
+        val contentType = request.getHeader("content-type");
         if (contentType == null) return null;
         if (contentType.indexOf("application/json") < 0) return null;
 
         try {
-            BufferedReader reader = request.getReader();
+            val reader = request.getReader();
             return CharStreams.toString(reader);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -258,12 +258,12 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     };
 
     private void appendHeaders(HttpServletRequest request, Appendable signStr) {
-        Enumeration<String> headerNames = request.getHeaderNames();
+        val headerNames = request.getHeaderNames();
         while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
+            val headerName = headerNames.nextElement();
             if (ArrayUtils.contains(filtered, headerName)) continue;
 
-            Enumeration<String> headers = request.getHeaders(headerName);
+            val headers = request.getHeaders(headerName);
             signStr.append(headerName).append('$');
 
             joinEnumeration(signStr, headers);
@@ -279,8 +279,8 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     private void appendMethodAndUrl(HttpServletRequest request, Appendable signStr) {
         signStr.append(request.getMethod()).append('$');
 
-        StringBuilder fullUrl = new StringBuilder(request.getRequestURL());
-        String queryString = request.getQueryString();
+        val fullUrl = new StringBuilder(request.getRequestURL());
+        val queryString = request.getQueryString();
         if (!Strings.isNullOrEmpty(queryString)) fullUrl.append('?').append(queryString);
 
         signStr.append(fullUrl.toString()).append('$');
