@@ -4,11 +4,13 @@ import com.github.bingoohuang.springrest.boot.annotations.RestfulSign;
 import com.github.bingoohuang.springrest.boot.filter.BufferedRequestWrapper;
 import com.github.bingoohuang.utils.codec.Base64;
 import com.github.bingoohuang.utils.net.Http;
+import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.io.CharStreams;
+import lombok.experimental.var;
 import lombok.val;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -34,27 +36,27 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     public static final String CLIENT_SECURITY = "d51fd93e-f6c9-4eae-ae7a-9b37af1a60cc";
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
+    public boolean preHandle(HttpServletRequest req, HttpServletResponse rso, Object handler) {
         if (!(handler instanceof HandlerMethod)) return false;
 
         val method = (HandlerMethod) handler;
         val beanType = method.getBeanType();
         val ignoreSign = ignoreSign(beanType, method);
-        val logger = LoggerFactory.getLogger("rest." + beanType.getName());
+        val log = LoggerFactory.getLogger("rest." + beanType.getName());
 
-        if (ignoreSign && !logger.isInfoEnabled()) return true;
+        if (ignoreSign && !log.isInfoEnabled()) return true;
 
-        String hici = request.getHeader("hici");
+        var hici = req.getHeader("hici");
         if (StringUtils.isEmpty(hici)) hici = UUID.randomUUID().toString();
 
-        request.setAttribute("_log_hici", hici);
-        request.setAttribute("_log_start", System.currentTimeMillis());
+        req.setAttribute("_log_hici", hici);
+        req.setAttribute("_log_start", System.currentTimeMillis());
 
-        val contentType = request.getContentType();
+        val contentType = req.getContentType();
         val lowerContentType = StringUtils.lowerCase(contentType);
         String requestBody = null;
         if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
-            val requestWrapper = (BufferedRequestWrapper) request.getAttribute("_log_req");
+            val requestWrapper = (BufferedRequestWrapper) req.getAttribute("_log_req");
             requestBody = requestWrapper.getRequestBody();
         }
         if (StringUtils.isEmpty(requestBody)) requestBody = "(empty)";
@@ -62,28 +64,28 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         val signStr = new StringBuilder();
         val logStr = new StringBuilder();
         val proxy = new AbbreviateAppendable(logStr, signStr);
-        createOriginalStringForSign(proxy, request);
-        logger.info("spring rest server {} request {} body: {}", hici, logStr, requestBody);
+        createOriginalStringForSign(proxy, req);
+        log.info("spring rest server {} request {} body: {}", hici, logStr, requestBody);
 
         if (ignoreSign) return true;
 
-        val hisv = request.getHeader("hisv");
+        val hisv = req.getHeader("hisv");
         if (Strings.isNullOrEmpty(hisv)) {
-            logger.info("spring rest server {} signature missed", hici);
-            Http.error(response, 416, "signature missed");
+            log.info("spring rest server {} signature missed", hici);
+            Http.error(rso, 416, "signature missed");
             return false;
         }
 
         val sign = hmacSHA256(signStr.toString(), CLIENT_SECURITY);
         val signOk = sign.equals(hisv);
-        logger.info("spring rest server {} sign result {}", hici, signOk);
-        if (!signOk) Http.error(response, 416, "invalid signature");
+        log.info("spring rest server {} sign result {}", hici, signOk);
+        if (!signOk) Http.error(rso, 416, "invalid signature");
 
         return signOk;
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+    public void afterCompletion(HttpServletRequest req, HttpServletResponse rsp, Object handler, Exception ex) {
         if (!(handler instanceof HandlerMethod)) return;
 
         val method = (HandlerMethod) handler;
@@ -92,39 +94,44 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         if (!logger.isInfoEnabled()) return;
 
         val headerSb = new StringBuilder();
-        val headerNames = response.getHeaderNames();
+        val headerNames = rsp.getHeaderNames();
         val joiner = Joiner.on(',');
         for (val headerName : headerNames) {
             headerSb.append(headerName).append('=');
-            val headers = response.getHeaders(headerName);
+            val headers = rsp.getHeaders(headerName);
             joiner.join(headers);
             headerSb.append(headers).append('&');
         }
-        val contentType = response.getContentType();
+        val contentType = rsp.getContentType();
         headerSb.append("Content-Type=").append(contentType);
 
-        val baos = (ByteArrayOutputStream) request.getAttribute("_log_baos");
-        val sw = (StringWriter) request.getAttribute("_log_sw");
+        val baos = (ByteArrayOutputStream) req.getAttribute("_log_baos");
+        val sw = (StringWriter) req.getAttribute("_log_sw");
+        val body = parseBody(contentType, baos, sw);
+
+        val hici = (String) req.getAttribute("_log_hici");
+        val start = (Long) req.getAttribute("_log_start");
+        val costMillis = System.currentTimeMillis() - start;
+
+        logger.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
+                hici, costMillis, rsp.getStatus(), headerSb, body);
+    }
+
+    private String parseBody(String contentType, ByteArrayOutputStream baos, StringWriter sw) {
         String body = null;
 
         val lowerContentType = StringUtils.lowerCase(contentType);
         if (containsAnyOrNull(lowerContentType, "json", "xml", "text")) {
             val bytes = baos.toByteArray();
             if (bytes.length > 0) {
-                body = new String(bytes, "UTF-8");
+                body = new String(bytes, Charsets.UTF_8);
             } else {
                 body = sw.toString();
             }
         }
 
         if (body == null || body.contains("<html>")) body = " ignored";
-
-        val hici = (String) request.getAttribute("_log_hici");
-        val start = (Long) request.getAttribute("_log_start");
-        val costMillis = System.currentTimeMillis() - start;
-
-        logger.info("spring rest server {} response cost {} millis, status code {}, headers: {}, body: {}",
-                hici, costMillis, response.getStatus(), headerSb, body);
+        return body;
     }
 
     private boolean containsAnyOrNull(String contentType, String... any) {
@@ -143,11 +150,12 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
     }
 
     private boolean ignoreSign(Class<?> beanType, HandlerMethod method) {
-        RestfulSign restfulSign = method.getMethod().getAnnotation(RestfulSign.class);
-        if (restfulSign != null) return restfulSign.ignore();
+        val restfulSign1 = method.getMethod().getAnnotation(RestfulSign.class);
+        if (restfulSign1 != null) return restfulSign1.ignore();
 
-        restfulSign = beanType.getAnnotation(RestfulSign.class);
-        if (restfulSign != null) return restfulSign.ignore();
+        val restfulSign2 = beanType.getAnnotation(RestfulSign.class);
+        if (restfulSign2 != null) return restfulSign2.ignore();
+
         return true;
     }
 
