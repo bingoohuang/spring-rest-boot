@@ -4,12 +4,12 @@ import com.github.bingoohuang.springrest.boot.annotations.RestfulSign;
 import com.github.bingoohuang.springrest.boot.filter.BufferedRequestWrapper;
 import com.github.bingoohuang.utils.codec.Base64;
 import com.github.bingoohuang.utils.net.Http;
+import com.github.bingoohuang.utils.sys.Hostname;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.common.io.CharStreams;
-import lombok.Cleanup;
 import lombok.SneakyThrows;
 import lombok.experimental.var;
 import lombok.val;
@@ -28,45 +28,19 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.util.Enumeration;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.UUID;
 
 public class SignInterceptor extends HandlerInterceptorAdapter {
     public static final String CLIENT_SECURITY = "d51fd93e-f6c9-4eae-ae7a-9b37af1a60cc";
 
-    public static final String HOSTNAME = getHostname();
-
-    private static String getHostname() {
-        try {
-            return StringUtils.trim(execReadToString("hostname"));
-        } catch (Throwable ex) {
-            // ignore
-        }
-
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (Throwable ex) {
-            // ignore
-        }
-
-        return "unknown";
-    }
-
-    @SneakyThrows
-    public static String execReadToString(String execCommand) {
-        val proc = Runtime.getRuntime().exec(execCommand);
-        @Cleanup val stream = proc.getInputStream();
-        @Cleanup val scanner = new Scanner(stream).useDelimiter("\\A");
-        return scanner.hasNext() ? scanner.next() : "";
-    }
-
     @Override
     public boolean preHandle(
             HttpServletRequest req, HttpServletResponse rsp, Object handler) {
+        rsp.addHeader("Rest-Server", Hostname.HOSTNAME);
+
         if (!(handler instanceof HandlerMethod)) return false;
 
         val method = (HandlerMethod) handler;
@@ -121,8 +95,6 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
             HttpServletRequest req, HttpServletResponse rsp,
             Object handler, Exception ex) {
         if (!(handler instanceof HandlerMethod)) return;
-
-        rsp.addHeader("Rest-Server", HOSTNAME);
 
         val method = (HandlerMethod) handler;
         val beanType = method.getBeanType();
