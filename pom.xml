@@ -39,20 +39,20 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.16.18</version>
+            <version>1.16.20</version>
             <scope>provided</scope>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>com.github.bingoohuang</groupId>
             <artifactId>blackcat-instrument</artifactId>
-            <version>0.0.12</version>
+            <version>0.0.14</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>3.4</version>
+            <version>3.7</version>
         </dependency>
         <dependency>
             <groupId>commons-io</groupId>
@@ -67,12 +67,12 @@
         <dependency>
             <groupId>com.github.bingoohuang</groupId>
             <artifactId>java-utils</artifactId>
-            <version>0.0.4</version>
+            <version>0.0.10</version>
         </dependency>
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
-            <version>2.7.2</version>
+            <version>2.9.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -82,12 +82,12 @@
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>18.0</version>
+            <version>20.0</version>
         </dependency>
         <dependency>
             <groupId>com.github.bingoohuang</groupId>
             <artifactId>asmvalidator</artifactId>
-            <version>0.0.1</version>
+            <version>0.0.15</version>
         </dependency>
     </dependencies>
 

@@ -7,9 +7,10 @@ import com.github.bingoohuang.utils.net.Http;
 import com.google.common.base.Charsets;
 import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.collect.Maps;
 import com.google.common.io.CharStreams;
+import lombok.Cleanup;
+import lombok.SneakyThrows;
 import lombok.experimental.var;
 import lombok.val;
 import org.apache.commons.lang3.ArrayUtils;
@@ -27,16 +28,45 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.security.MessageDigest;
 import java.util.Enumeration;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.UUID;
 
 public class SignInterceptor extends HandlerInterceptorAdapter {
     public static final String CLIENT_SECURITY = "d51fd93e-f6c9-4eae-ae7a-9b37af1a60cc";
 
+    public static final String HOSTNAME = getHostname();
+
+    private static String getHostname() {
+        try {
+            return StringUtils.trim(execReadToString("hostname"));
+        } catch (Throwable ex) {
+            // ignore
+        }
+
+        try {
+            return InetAddress.getLocalHost().getHostName();
+        } catch (Throwable ex) {
+            // ignore
+        }
+
+        return "unknown";
+    }
+
+    @SneakyThrows
+    public static String execReadToString(String execCommand) {
+        val proc = Runtime.getRuntime().exec(execCommand);
+        @Cleanup val stream = proc.getInputStream();
+        @Cleanup val scanner = new Scanner(stream).useDelimiter("\\A");
+        return scanner.hasNext() ? scanner.next() : "";
+    }
+
     @Override
-    public boolean preHandle(HttpServletRequest req, HttpServletResponse rso, Object handler) {
+    public boolean preHandle(
+            HttpServletRequest req, HttpServletResponse rsp, Object handler) {
         if (!(handler instanceof HandlerMethod)) return false;
 
         val method = (HandlerMethod) handler;
@@ -72,21 +102,27 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         val hisv = req.getHeader("hisv");
         if (Strings.isNullOrEmpty(hisv)) {
             log.info("spring rest server {} signature missed", hici);
-            Http.error(rso, 416, "signature missed");
+            Http.error(rsp, 416, "signature missed");
             return false;
         }
 
         val sign = hmacSHA256(signStr.toString(), CLIENT_SECURITY);
         val signOk = sign.equals(hisv);
         log.info("spring rest server {} sign result {}", hici, signOk);
-        if (!signOk) Http.error(rso, 416, "invalid signature");
+        if (!signOk) {
+            Http.error(rsp, 416, "invalid signature");
+        }
 
         return signOk;
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest req, HttpServletResponse rsp, Object handler, Exception ex) {
+    public void afterCompletion(
+            HttpServletRequest req, HttpServletResponse rsp,
+            Object handler, Exception ex) {
         if (!(handler instanceof HandlerMethod)) return;
+
+        rsp.addHeader("Rest-Server", HOSTNAME);
 
         val method = (HandlerMethod) handler;
         val beanType = method.getBeanType();
@@ -159,16 +195,20 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         return true;
     }
 
+    @SneakyThrows
+    public static String md5(byte[] bytes) {
+        val md = MessageDigest.getInstance("MD5");
+        val digest = md.digest(bytes);
+        return Base64.base64(digest, Base64.Format.Standard);
+    }
+
+    @SneakyThrows
     public static String hmacSHA256(String data, String key) {
-        try {
-            val secretKey = new SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
-            val mac = Mac.getInstance("HmacSHA256");
-            mac.init(secretKey);
-            val hmacData = mac.doFinal(data.getBytes("UTF-8"));
-            return Base64.base64(hmacData, Base64.Format.Standard);
-        } catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        val secretKey = new SecretKeySpec(key.getBytes("UTF-8"), "HmacSHA256");
+        val mac = Mac.getInstance("HmacSHA256");
+        mac.init(secretKey);
+        val hmacData = mac.doFinal(data.getBytes("UTF-8"));
+        return Base64.base64(hmacData, Base64.Format.Standard);
     }
 
     private void appendRequestParams(HttpServletRequest request, Appendable signStr) {
@@ -176,7 +216,9 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         parameterMap.putAll(request.getParameterMap());
 
         val json = getJson(request);
-        if (!Strings.isNullOrEmpty(json)) parameterMap.put("_json", new String[]{json});
+        if (!Strings.isNullOrEmpty(json)) {
+            parameterMap.put("_json", new String[]{json});
+        }
         fileUpload(request, parameterMap);
 
         val queryString = request.getQueryString();
@@ -220,15 +262,6 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         }
     }
 
-    public static String md5(byte[] bytes) {
-        try {
-            val md = MessageDigest.getInstance("MD5");
-            val digest = md.digest(bytes);
-            return Base64.base64(digest, Base64.Format.Standard);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     public String getJson(HttpServletRequest request) {
         if (!"POST".equalsIgnoreCase(request.getMethod())) return null;
@@ -284,12 +317,14 @@ public class SignInterceptor extends HandlerInterceptorAdapter {
         }
     }
 
-    private void appendMethodAndUrl(HttpServletRequest request, Appendable signStr) {
-        signStr.append(request.getMethod()).append('$');
+    private void appendMethodAndUrl(HttpServletRequest req, Appendable signStr) {
+        signStr.append(req.getMethod()).append('$');
 
-        val fullUrl = new StringBuilder(request.getRequestURL());
-        val queryString = request.getQueryString();
-        if (!Strings.isNullOrEmpty(queryString)) fullUrl.append('?').append(queryString);
+        val fullUrl = new StringBuilder(req.getRequestURL());
+        val queryString = req.getQueryString();
+        if (!Strings.isNullOrEmpty(queryString)) {
+            fullUrl.append('?').append(queryString);
+        }
 
         signStr.append(fullUrl.toString()).append('$');
     }

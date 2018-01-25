@@ -1,5 +1,6 @@
 package com.github.bingoohuang.springrest.boot.filter;
 
+import lombok.val;
 import org.apache.commons.io.output.TeeOutputStream;
 import org.springframework.stereotype.Component;
 
@@ -22,10 +23,10 @@ public class MultiReadFilter implements Filter {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
         // use wrapper to read multiple times the content
-        BufferedRequestWrapper req = new BufferedRequestWrapper((HttpServletRequest) request);
+        val req = new BufferedRequestWrapper((HttpServletRequest) request);
 
-        final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        final StringWriter sw = new StringWriter();
+        val baos = new ByteArrayOutputStream();
+        val sw = new StringWriter();
         req.setAttribute("_log_baos", baos);
         req.setAttribute("_log_sw", sw);
         req.setAttribute("_log_req", req);
@@ -33,15 +34,15 @@ public class MultiReadFilter implements Filter {
         chain.doFilter(req, new HttpServletResponseWrapper((HttpServletResponse) response) {
             @Override
             public ServletOutputStream getOutputStream() throws IOException {
-                ServletOutputStream outputStream = super.getOutputStream();
-                TeeOutputStream targetStream = new TeeOutputStream(outputStream, baos);
+                val outputStream = super.getOutputStream();
+                val targetStream = new TeeOutputStream(outputStream, baos);
                 return new DelegatingServletOutputStream(targetStream);
             }
 
             @Override
             public PrintWriter getWriter() throws IOException {
-                PrintWriter writer = super.getWriter();
-                TeeWriter teeWriter = new TeeWriter(writer, sw);
+                val writer = super.getWriter();
+                val teeWriter = new TeeWriter(writer, sw);
                 return new PrintWriter(teeWriter);
             }
         });

@@ -3,6 +3,7 @@ package com.github.bingoohuang.springrest.boot.resolver;
 import com.github.bingoohuang.asmvalidator.ex.AsmValidateException;
 import com.github.bingoohuang.utils.codec.Json;
 import com.google.common.primitives.Primitives;
+import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.core.MethodParameter;
@@ -11,7 +12,6 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.annotation.RequestParamMethodArgumentResolver;
 
 import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 
 import static com.github.bingoohuang.asmvalidator.AsmParamsValidatorFactory.createValidators;
 import static com.github.bingoohuang.asmvalidator.AsmParamsValidatorFactory.validate;
@@ -32,8 +32,8 @@ public class HiRequestParamMethodArgumentResolver
             String name, MethodParameter parameter,
             NativeWebRequest webRequest
     ) throws Exception {
-        Object arg = super.resolveName(name, parameter, webRequest);
-        Object obj = tryUnJson(parameter, arg);
+        val arg = super.resolveName(name, parameter, webRequest);
+        val obj = tryUnJson(parameter, arg);
 
         asmValidate(parameter, obj);
 
@@ -41,13 +41,13 @@ public class HiRequestParamMethodArgumentResolver
     }
 
     private void asmValidate(MethodParameter mp, Object obj) {
-        boolean ok = createValidators(mp.getMethod());
+        val ok = createValidators(mp.getMethod());
         if (!ok) return;
 
         try {
             validate(mp.getMethod(), mp.getParameterIndex(), obj);
         } catch (AsmValidateException ex) {
-            RequestParam rp = mp.getParameterAnnotation(RequestParam.class);
+            val rp = mp.getParameterAnnotation(RequestParam.class);
             if (StringUtils.isNotEmpty(rp.value()))
                 ex.replaceFieldName("arg" + mp.getParameterIndex(), rp.value());
 
@@ -77,15 +77,15 @@ public class HiRequestParamMethodArgumentResolver
     private Object tryParseAsJson(
             MethodParameter parameter, String str, Class<?> parameterType) {
         char c = str.charAt(0);
-        boolean maybeJson = c == '{';
+        val maybeJson = c == '{';
         if (maybeJson) return Json.unJson(str, parameterType);
 
-        boolean maybeJsonArray = c == '[';
+        val maybeJsonArray = c == '[';
         if (!maybeJsonArray) return str;
 
-        Type genericParamType = parameter.getGenericParameterType();
+        val genericParamType = parameter.getGenericParameterType();
         if (genericParamType instanceof ParameterizedType) {
-            ParameterizedType paramType = (ParameterizedType) genericParamType;
+            val paramType = (ParameterizedType) genericParamType;
             Class argClz = (Class) paramType.getActualTypeArguments()[0];
 
             return Json.unJsonArray(str, argClz);

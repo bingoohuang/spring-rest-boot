@@ -1,6 +1,7 @@
 package com.github.bingoohuang.springrest.boot.filter;
 
 import com.google.common.base.Charsets;
+import lombok.val;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
@@ -56,7 +57,7 @@ public class BufferedRequestWrapper extends HttpServletRequestWrapper {
 
         InputStream in = request.getInputStream();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        val baos = new ByteArrayOutputStream();
         byte[] buffer = new byte[1024];
         int bytesRead = -1;
         while ((bytesRead = in.read(buffer)) > 0) {
@@ -76,7 +77,7 @@ public class BufferedRequestWrapper extends HttpServletRequestWrapper {
 
     @Override
     public ServletInputStream getInputStream() throws IOException {
-        ByteArrayInputStream in = new ByteArrayInputStream(mBodyBuffer);
+        val in = new ByteArrayInputStream(mBodyBuffer);
         return new BufferedServletInputStream(in, super.getInputStream());
     }
 }
